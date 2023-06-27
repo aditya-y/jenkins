@@ -1,0 +1,117 @@
+---
+- name: Download, install and configure the Splunk Universal Forwarder
+  hosts: all
+  become: yes
+  become_user: root
+  tasks:
+    - name: Download the Splunk Universal Forwarder
+      get_url:
+        url: https://download.splunk.com/products/universalforwarder/releases/9.0.3/linux/splunkforwarder-9.0.3-dd0128b1f8cd-Linux-x86_64.tgz
+        dest: /tmp
+    - name: Upload file from ansible server to remote
+      copy:
+        src:  /tmp/aus_nonprod_deploymentclient.tgz
+        dest: /tmp/
+    - name: Copy tarball to /opt
+      shell: |
+        cp -fp /tmp/splunkforwarder-9.0.3-dd0128b1f8cd-Linux-x86_64.tgz /opt
+        cp -fp /tmp/aus_nonprod_deploymentclient.tgz /opt
+    - name: create splunk group
+      group:
+        name: splunk
+        state: present
+    - name: create splunk user
+      user:
+        name: splunk
+        group: splunk
+        append: yes
+        shell: /bin/bash
+    - name: Change ownership of tarball
+      file:
+        path: /opt/{{ item }}
+        owner: splunk
+        group: splunk
+        mode: 0664
+      loop:
+        - splunkforwarder-9.0.3-dd0128b1f8cd-Linux-x86_64.tgz
+        - aus_nonprod_deploymentclient.tgz
+    - name: Untar both tarballs
+      unarchive:
+        src: /opt/{{ item }}
+        dest: /opt/
+        remote_src: yes
+      loop:
+        - aus_nonprod_deploymentclient.tgz
+        - splunkforwarder-9.0.3-dd0128b1f8cd-Linux-x86_64.tgz
+    - name: changing ownership
+      shell: |
+        chown -R splunk:splunk /opt/splunkforwarder
+        chown -R splunk:splunk /opt/aus_nonprod_deploymentclient
+    - name: accept the license
+      shell: |
+        /opt/splunkforwarder/bin/splunk stop
+        /opt/splunkforwarder/bin/splunk start --accept-license --answer-yes --no-prompt --seed-passwd password
+    - name: create the SplunkForwarder service unit file in /etc/systemd/system/
+        directory
+      shell: "{{ item }}"
+      with_items:
+        - /opt/splunkforwarder/bin/splunk stop
+        - /opt/splunkforwarder/bin/splunk enable boot-start -user splunk -systemd-managed 1
+
+    - name: grab the username and password form the Secrets Manager - inject into
+        user-seed.conf
+      shell: |
+        SPLUNKADMINPASSWORD = $(echo "XXXXXXXXXXXXXXXXXXXXXXXXXX" | base64 -d)
+        sleep 5
+        rm -f /opt/splunkforwarder/etc/system/local/user-seed.conf
+        sleep 5
+        echo '[user_info]' >> /opt/splunkforwarder/etc/system/local/user-seed.conf
+        sleep 1
+        echo 'USERNAME = admin' >> /opt/splunkforwarder/etc/system/local/user-seed.conf
+        sleep 1
+        echo 'PASSWORD = $SPLUNKADMINPASSWORD' >> /opt/splunkforwarder/etc/system/local/user-seed.conf
+        sleep 1
+        chown splunk:splunk /opt/splunkforwarder/etc/system/local/user-seed.conf
+        sleep 5
+        cat /opt/splunkforwarder/etc/system/local/user-seed.conf
+
+    - name: Start SplunkForwarder using the systemd command
+      systemd:
+        name: SplunkForwarder
+        state: started
+        enabled: yes
+
+    - name: Moving aus_nonprod_deploymentclient folder
+      command: 'mv /opt/aus_nonprod_deploymentclient /opt/splunkforwarder/etc/apps/'
+      ignore_errors: true
+    - name: Change Permissions of host OS log files/folders so Splunk can read them
+      shell: |
+        setfacl -R -m "u:splunk:rx" /var/log
+
+        sed -i.$(date +%Y%m%d) 's/^log_group = root/log_group = splunk/' /etc/audit/auditd.conf
+
+        service auditd restart
+
+        chmod -R 755 /var/log/audit /var/log/secure /root/.bash_history /home/*/.bash_history
+    - name: stop then restart the SplunkForwarder process using Systemd commands
+      systemd:
+        name: SplunkForwarder
+        state: restarted
+    - name: check if splunk service is running
+      command: pgrep splunk
+      ignore_errors: true
+    - name: remove files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /opt/splunkforwarder/var/lib/splunk/fishbucket
+        - /opt/splunkforwarder/etc/system/local/inputs.conf
+        - /opt/splunkforwarder/etc/system/local/server.conf
+        - /opt/splunkforwarder/etc/instance.cfg
+        - /tmp/secret.txt
+    - name: change permission of splunkforwarder
+      command: chmod 750 /opt/splunkforwarder
+
+
+##############END###########
