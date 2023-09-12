@@ -5,8 +5,8 @@ RUN yum install -y httpd \
 	zip \
 	unzip
 WORKDIR /var/www/html
-RUN git clone https://github.com/aditya-y/cricketus.git
-RUN cp -rv cricketus/* .
-RUN rm -rf cricketus
+RUN git clone https://github.com/aditya-y/enggkitchen.git
+RUN cp -rv enggkitchen/* .
+RUN rm -rf enggkitchen
 CMD ["/usr/sbin/httpd", "-D", "FOREGROUND"]
 EXPOSE 80
