@@ -10,3 +10,4 @@ RUN cp -rv enggkitchen/* .
 RUN rm -rf enggkitchen
 CMD ["/usr/sbin/httpd", "-D", "FOREGROUND"]
 EXPOSE 80
+
