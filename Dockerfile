@@ -8,8 +8,8 @@ RUN yum install -y httpd \
 WORKDIR /var/www/html
 RUN wget https://www.free-css.com/assets/files/free-css-templates/download/page295/edgecut.zip
 RUN unzip edgecut.zip
-RUN cp -rv edgecut/* .
-RUN rm -rf edgecut
+RUN cp -rv edgecut-html/* .
+RUN rm -rf edgecut-html
 CMD ["/usr/sbin/httpd", "-D", "FOREGROUND"]
 EXPOSE 80
 
