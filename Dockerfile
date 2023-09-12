@@ -3,7 +3,8 @@ RUN yum update -y
 RUN yum install -y httpd \
 	git \
 	zip \
-	unzip
+	unzip \
+ 	wget
 WORKDIR /var/www/html
 RUN wget https://www.free-css.com/assets/files/free-css-templates/download/page295/edgecut.zip
 RUN unzip edgecut.zip .
